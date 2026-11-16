@@ -10,5 +10,6 @@ support.html
 flights.html
 
 I used Gemini for this task
+LINK:  https://i263203-d.github.io/FairFly/
 
 
