@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>FairFly — Global Route Radar</title>
+  
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            navy: '#1E2235',
+            brandPurple: '#7C3AED',
+            brandMagenta: '#D946EF',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/animations.css" />
+
+</head>
+<body class="">
+  
+  <canvas id="skyCanvas"></canvas>
+  <div id="pageCurtain"></div>
+  <div class="cursor-dot hidden lg:block" id="cursorDot"></div>
+  <div class="cursor-ring hidden lg:block" id="cursorRing"></div>
+
+  <!-- Navbar -->
+  <header class="max-w-7xl mx-auto px-6 lg:px-12 pt-6 pb-3 flex items-center justify-between relative z-30">
+    <a href="index.html" onclick="navigateSmooth(event, 'index.html')" class="text-2xl font-extrabold tracking-tight flex items-center gap-2 group">
+      <div class="w-8 h-8 rounded-xl brand-gradient flex items-center justify-center text-white shadow-md group-hover:rotate-12 transition-transform">
+        <i data-lucide="send" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <span class="text-navy">Fair</span><span class="bg-gradient-to-r from-brandPurple to-brandMagenta bg-clip-text text-transparent">Fly</span>
+      </div>
+    </a>
+
+    <nav class="hidden md:flex items-center gap-8 text-[15px]">
+      <a href="index.html" onclick="navigateSmooth(event, 'index.html')" class="text-navy/70 hover:text-navy font-semibold transition">Home</a>
+<a href="flights.html" onclick="navigateSmooth(event, 'flights.html')" class="text-navy/70 hover:text-navy font-semibold transition">Flights</a>
+<a href="destinations.html" onclick="navigateSmooth(event, 'destinations.html')" class="text-navy font-extrabold relative after:content-[''] after:absolute after:-bottom-1.5 after:left-0 after:w-full after:h-[2.5px] after:rounded-full after:bg-gradient-to-r after:from-brandPurple after:to-brandMagenta">Destinations</a>
+<a href="deals.html" onclick="navigateSmooth(event, 'deals.html')" class="text-navy/70 hover:text-navy font-semibold transition">Deals</a>
+<a href="about.html" onclick="navigateSmooth(event, 'about.html')" class="text-navy/70 hover:text-navy font-semibold transition">About Us</a>
+<a href="support.html" onclick="navigateSmooth(event, 'support.html')" class="text-navy/70 hover:text-navy font-semibold transition">Support</a>
+
+    </nav>
+
+    <div class="flex items-center gap-2.5">
+      <!-- Live Audio Synth Toggle -->
+      <button onclick="toggleSound()" id="soundToggleBtn" title="Toggle Cabin UI Sound Effects" class="p-2.5 rounded-xl bg-white/60 hover:bg-white text-navy/80 hover:text-brandPurple border border-white/80 transition cursor-pointer">
+        <i data-lucide="volume-2" class="w-4 h-4" id="soundIcon"></i>
+      </button>
+
+      <!-- AI Copilot Trigger -->
+      <button onclick="toggleAiCopilot()" class="hidden sm:flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/75 hover:bg-white text-navy text-xs font-bold border border-brandPurple/25 shadow-sm transition cursor-pointer">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        <span>AI Concierge</span>
+      </button>
+
+      <!-- Command Palette Trigger (Cmd+K) -->
+      <button onclick="openCommandPalette()" title="Quick Command (Ctrl+K)" class="hidden lg:flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-navy/5 hover:bg-navy/10 text-navy/70 text-xs font-mono font-semibold transition cursor-pointer">
+        <i data-lucide="command" class="w-3.5 h-3.5"></i>
+        <span>Ctrl+K</span>
+      </button>
+
+      <button onclick="openLoginModal()" class="brand-gradient text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-sm">
+        Login
+      </button>
+    </div>
+  </header>
+
+  
+  <main class="max-w-7xl mx-auto px-6 lg:px-12 py-8 relative z-20 space-y-10">
+    <!-- Interactive Live Flight Radar Hub -->
+    <section class="reveal-up glass-panel rounded-3xl p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center shadow-sm">
+      <div class="lg:col-span-5 space-y-4">
+        <span class="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-brandPurple bg-purple-100 px-3 py-1 rounded-full">
+          <i data-lucide="radar" class="w-3.5 h-3.5"></i> Global Route Telemetry
+        </span>
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-navy leading-tight">Interactive World Route Radar</h1>
+        <p class="text-sm text-navy/75 leading-relaxed">
+          Click any destination node on our live radar or filter below to lock in instant direct connections from your hub.
+        </p>
+        <div id="radarReadout" class="bg-white/85 rounded-2xl p-4 border border-purple-100 flex items-center justify-between">
+          <div>
+            <span class="text-[11px] font-bold text-slate-400 block">SELECTED HUB</span>
+            <span class="text-base font-extrabold text-navy" id="radarCityName">Tokyo, Japan (TYO)</span>
+          </div>
+          <button onclick="bookDestination(selectedRadarCity)" class="brand-gradient text-white text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer">
+            Book Now →
+          </button>
+        </div>
+      </div>
+
+      <!-- Visual Radar Display -->
+      <div class="lg:col-span-7 flex justify-center">
+        <div class="relative w-full max-w-md h-64 rounded-3xl bg-navy overflow-hidden border border-purple-400/30 shadow-xl flex items-center justify-center">
+          <!-- Concentric Radar Circles -->
+          <div class="w-56 h-56 rounded-full border border-purple-400/20 absolute"></div>
+          <div class="w-36 h-36 rounded-full border border-purple-400/25 absolute"></div>
+          <div class="w-16 h-16 rounded-full border border-purple-400/30 absolute"></div>
+          <div class="w-56 h-56 rounded-full radar-sweep absolute"></div>
+
+          <!-- Interactive Radar Pins -->
+          <button onclick="selectRadarPin('Tokyo', 'Tokyo, Japan (TYO) • $540')" style="top: 28%; right: 20%;" class="absolute group flex items-center gap-1.5 cursor-pointer">
+            <span class="w-3.5 h-3.5 rounded-full bg-brandMagenta ring-4 ring-brandMagenta/30 animate-ping absolute"></span>
+            <span class="w-3.5 h-3.5 rounded-full bg-brandMagenta relative"></span>
+            <span class="text-[11px] font-mono font-bold text-white bg-black/50 px-2 py-0.5 rounded">TYO</span>
+          </button>
+
+          <button onclick="selectRadarPin('Paris', 'Paris, France (CDG) • $780')" style="top: 32%; left: 26%;" class="absolute group flex items-center gap-1.5 cursor-pointer">
+            <span class="w-3.5 h-3.5 rounded-full bg-purple-400 relative"></span>
+            <span class="text-[11px] font-mono font-bold text-white bg-black/50 px-2 py-0.5 rounded">CDG</span>
+          </button>
+
+          <button onclick="selectRadarPin('Dubai', 'Dubai, UAE (DXB) • $490')" style="top: 52%; left: 46%;" class="absolute group flex items-center gap-1.5 cursor-pointer">
+            <span class="w-3.5 h-3.5 rounded-full bg-emerald-400 relative"></span>
+            <span class="text-[11px] font-mono font-bold text-white bg-black/50 px-2 py-0.5 rounded">DXB</span>
+          </button>
+
+          <button onclick="selectRadarPin('Bali', 'Bali, Indonesia (DPS) • $145')" style="bottom: 22%; right: 28%;" class="absolute group flex items-center gap-1.5 cursor-pointer">
+            <span class="w-3.5 h-3.5 rounded-full bg-amber-400 relative"></span>
+            <span class="text-[11px] font-mono font-bold text-white bg-black/50 px-2 py-0.5 rounded">DPS</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Region Filters -->
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <h2 class="text-2xl font-extrabold text-navy">Featured Flight Corridors</h2>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="filterRegion('All', this)" class="region-btn brand-gradient text-white text-xs font-bold px-5 py-2.5 rounded-full cursor-pointer">All Regions</button>
+        <button onclick="filterRegion('Asia', this)" class="region-btn bg-white/75 text-navy text-xs font-bold px-5 py-2.5 rounded-full hover:bg-white cursor-pointer">Asia</button>
+        <button onclick="filterRegion('Europe', this)" class="region-btn bg-white/75 text-navy text-xs font-bold px-5 py-2.5 rounded-full hover:bg-white cursor-pointer">Europe</button>
+        <button onclick="filterRegion('Middle East', this)" class="region-btn bg-white/75 text-navy text-xs font-bold px-5 py-2.5 rounded-full hover:bg-white cursor-pointer">Middle East</button>
+      </div>
+    </div>
+
+    <div id="destGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7"></div>
+  </main>
+
+  <script>
+    let selectedRadarCity = 'Tokyo';
+    function selectRadarPin(city, label) {
+      playChime(740);
+      selectedRadarCity = city;
+      document.getElementById('radarCityName').innerText = label;
+    }
+
+    const destinations = [
+      { city: 'Tokyo', country: 'Japan', region: 'Asia', price: 540, flights: '42 daily flights', img: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=800&q=80' },
+      { city: 'Paris', country: 'France', region: 'Europe', price: 780, flights: '28 daily flights', img: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80' },
+      { city: 'Dubai', country: 'UAE', region: 'Middle East', price: 490, flights: '35 daily flights', img: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=800&q=80' },
+      { city: 'Bali', country: 'Indonesia', region: 'Asia', price: 145, flights: '65 daily flights', img: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80' },
+      { city: 'Istanbul', country: 'Turkey', region: 'Europe', price: 610, flights: '19 daily flights', img: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=800&q=80' },
+      { city: 'Seoul', country: 'South Korea', region: 'Asia', price: 460, flights: '31 daily flights', img: 'https://images.unsplash.com/photo-1538485399081-7191377e8241?auto=format&fit=crop&w=800&q=80' }
+    ];
+
+    function filterRegion(region, btn) {
+      playChime(580);
+      document.querySelectorAll('.region-btn').forEach(b => {
+        b.classList.remove('brand-gradient', 'text-white');
+        b.classList.add('bg-white/75', 'text-navy');
+      });
+      btn.classList.remove('bg-white/75', 'text-navy');
+      btn.classList.add('brand-gradient', 'text-white');
+      renderDestinations(region === 'All' ? destinations : destinations.filter(d => d.region === region));
+    }
+
+    function bookDestination(city) {
+      playChime(760);
+      const current = JSON.parse(localStorage.getItem('fairfly_search')) || {
+        from: 'Jakarta', date: '2026-12-04', travelers: '2 Adults, 1 Child', cabin: 'Economy'
+      };
+      current.to = city;
+      localStorage.setItem('fairfly_search', JSON.stringify(current));
+      window.location.href = 'flights.html';
+    }
+
+    function renderDestinations(list) {
+      document.getElementById('destGrid').innerHTML = list.map((d, i) => `
+        <div style="animation-delay: ${i * 0.08}s" class="reveal-up glass-panel rounded-3xl overflow-hidden group shadow-sm hover:shadow-xl transition duration-300 flex flex-col">
+          <div class="h-52 overflow-hidden relative">
+            <img src="${d.img}" alt="${d.city}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+            <span class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-extrabold text-navy">${d.region}</span>
+          </div>
+          <div class="p-6 flex-1 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="text-xl font-extrabold text-navy">${d.city}, ${d.country}</h3>
+                <span class="text-sm font-extrabold text-brandPurple">From $${d.price}</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">${d.flights} • AI Price Protected</p>
+            </div>
+            <button onclick="bookDestination('${d.city}')" class="mt-5 w-full brand-gradient text-white text-sm font-bold py-3 rounded-xl transition cursor-pointer">
+              Explore Flights
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+    renderDestinations(destinations);
+  </script>
+
+  
+  <img id="escortJetBadge" src="jet.png" alt="FairFly Jet Escort" />
+
+  <!-- AI Travel Concierge Slide-Over Drawer -->
+  <div id="aiDrawer" class="fixed inset-y-0 right-0 w-full max-w-md bg-white/95 backdrop-blur-2xl shadow-2xl border-l border-purple-100 z-50 transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="p-6 border-b border-slate-100 flex items-center justify-between brand-gradient text-white">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-base">FairFly AI Flight Concierge</h3>
+          <p class="text-xs text-white/80">Live fare intelligence & instant booking</p>
+        </div>
+      </div>
+      <button onclick="toggleAiCopilot()" class="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div id="aiChatMessages" class="flex-1 p-5 overflow-y-auto space-y-4 text-sm">
+      <div class="bg-purple-50 border border-purple-100 rounded-2xl rounded-tl-none p-4 text-navy">
+        👋 Hi! I'm your **FairFly AI Copilot**. Ask me to find cheap flights, suggest destinations, or compare cabin classes!
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="askAiPreset('Cheapest flight from Jakarta to Tokyo?')" class="text-xs font-semibold bg-slate-100 hover:bg-purple-100 text-navy px-3 py-1.5 rounded-full transition cursor-pointer">✈️ Jakarta → Tokyo deals</button>
+        <button onclick="askAiPreset('Best time to book Bali flights?')" class="text-xs font-semibold bg-slate-100 hover:bg-purple-100 text-navy px-3 py-1.5 rounded-full transition cursor-pointer">🌴 Bali fare forecast</button>
+        <button onclick="askAiPreset('Compare Economy vs Business Class')" class="text-xs font-semibold bg-slate-100 hover:bg-purple-100 text-navy px-3 py-1.5 rounded-full transition cursor-pointer">🥂 Cabin comparison</button>
+      </div>
+    </div>
+
+    <form onsubmit="handleAiChat(event)" class="p-4 border-t border-slate-100 flex gap-2 bg-white">
+      <input id="aiChatInput" type="text" placeholder="Ask e.g. 'Find non-stop flights to Paris'..." class="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brandPurple" />
+      <button type="submit" class="brand-gradient text-white px-4 py-3 rounded-xl font-bold cursor-pointer">
+        <i data-lucide="send" class="w-4 h-4"></i>
+      </button>
+    </form>
+  </div>
+
+  <!-- Ctrl+K Command Palette Modal -->
+  <div id="cmdModal" class="fixed inset-0 bg-navy/45 backdrop-blur-sm hidden items-start justify-center pt-24 z-50 p-4" onclick="if(event.target===this) closeCommandPalette()">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center gap-3">
+        <i data-lucide="search" class="w-5 h-5 text-brandPurple"></i>
+        <input id="cmdSearchInput" type="text" oninput="filterCommands(this.value)" placeholder="Jump to page, destination, or action..." class="w-full text-sm font-semibold focus:outline-none" />
+        <span class="text-[10px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">ESC</span>
+      </div>
+      <div id="cmdList" class="p-2 max-h-72 overflow-y-auto divide-y divide-slate-50 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-navy/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="if(event.target===this) closeLoginModal()">
+    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative">
+      <button onclick="closeLoginModal()" class="absolute top-5 right-5 text-slate-400 hover:text-navy p-1 rounded-full cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <div class="text-2xl font-extrabold mb-1">
+        <span class="text-navy">Fair</span><span class="text-brandMagenta">Fly</span> <span class="text-xs font-mono bg-purple-100 text-brandPurple px-2 py-0.5 rounded-full align-middle">PRO</span>
+      </div>
+      <p class="text-slate-500 text-sm mb-6">Sign in to sync boarding passes, lounge passes, and FairMiles.</p>
+
+      <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Email Address</label>
+          <input type="email" required placeholder="captain@fairfly.aero" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-brandPurple text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Password</label>
+          <input type="password" required placeholder="••••••••" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-brandPurple text-sm" />
+        </div>
+        <button type="submit" class="w-full brand-gradient text-white font-semibold py-3 rounded-xl transition cursor-pointer">
+          Authenticate
+        </button>
+      </form>
+      <div id="loginSuccessMsg" class="hidden mt-4 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold text-center">
+        Authenticated! Welcome aboard, Captain.
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="max-w-7xl mx-auto px-6 lg:px-12 py-8 mt-8 border-t border-navy/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-navy/70 relative z-20">
+    <div class="flex items-center gap-2 font-extrabold text-base">
+      <span class="text-navy">Fair</span><span class="text-brandMagenta">Fly</span>
+      <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-purple-200 text-brandPurple">AERO-OS v2.6</span>
+    </div>
+    <div class="flex flex-wrap justify-center gap-6 font-semibold">
+      <a href="index.html" class="hover:text-navy">Home</a>
+      <a href="flights.html" class="hover:text-navy">Flights</a>
+      <a href="destinations.html" class="hover:text-navy">Destinations</a>
+      <a href="deals.html" class="hover:text-navy">Deals</a>
+      <a href="about.html" class="hover:text-navy">About Us</a>
+      <a href="support.html" class="hover:text-navy">Support</a>
+    </div>
+    <div>© 2026 FairFly Aviation Inc. • Live Telemetry Active</div>
+  </footer>
+
+  <script src="js/app.js"></script>
+  <script src="js/jet-engine.js"></script>
+</body>
+</html>

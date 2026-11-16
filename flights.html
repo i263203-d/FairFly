@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>FairFly — Live Flight Board & Seat Map</title>
+  
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            navy: '#1E2235',
+            brandPurple: '#7C3AED',
+            brandMagenta: '#D946EF',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="css/animations.css" />
+
+</head>
+<body class="">
+  
+  <canvas id="skyCanvas"></canvas>
+  <div id="pageCurtain"></div>
+  <div class="cursor-dot hidden lg:block" id="cursorDot"></div>
+  <div class="cursor-ring hidden lg:block" id="cursorRing"></div>
+
+  <!-- Navbar -->
+  <header class="max-w-7xl mx-auto px-6 lg:px-12 pt-6 pb-3 flex items-center justify-between relative z-30">
+    <a href="index.html" onclick="navigateSmooth(event, 'index.html')" class="text-2xl font-extrabold tracking-tight flex items-center gap-2 group">
+      <div class="w-8 h-8 rounded-xl brand-gradient flex items-center justify-center text-white shadow-md group-hover:rotate-12 transition-transform">
+        <i data-lucide="send" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <span class="text-navy">Fair</span><span class="bg-gradient-to-r from-brandPurple to-brandMagenta bg-clip-text text-transparent">Fly</span>
+      </div>
+    </a>
+
+    <nav class="hidden md:flex items-center gap-8 text-[15px]">
+      <a href="index.html" onclick="navigateSmooth(event, 'index.html')" class="text-navy/70 hover:text-navy font-semibold transition">Home</a>
+<a href="flights.html" onclick="navigateSmooth(event, 'flights.html')" class="text-navy font-extrabold relative after:content-[''] after:absolute after:-bottom-1.5 after:left-0 after:w-full after:h-[2.5px] after:rounded-full after:bg-gradient-to-r after:from-brandPurple after:to-brandMagenta">Flights</a>
+<a href="destinations.html" onclick="navigateSmooth(event, 'destinations.html')" class="text-navy/70 hover:text-navy font-semibold transition">Destinations</a>
+<a href="deals.html" onclick="navigateSmooth(event, 'deals.html')" class="text-navy/70 hover:text-navy font-semibold transition">Deals</a>
+<a href="about.html" onclick="navigateSmooth(event, 'about.html')" class="text-navy/70 hover:text-navy font-semibold transition">About Us</a>
+<a href="support.html" onclick="navigateSmooth(event, 'support.html')" class="text-navy/70 hover:text-navy font-semibold transition">Support</a>
+
+    </nav>
+
+    <div class="flex items-center gap-2.5">
+      <!-- Live Audio Synth Toggle -->
+      <button onclick="toggleSound()" id="soundToggleBtn" title="Toggle Cabin UI Sound Effects" class="p-2.5 rounded-xl bg-white/60 hover:bg-white text-navy/80 hover:text-brandPurple border border-white/80 transition cursor-pointer">
+        <i data-lucide="volume-2" class="w-4 h-4" id="soundIcon"></i>
+      </button>
+
+      <!-- AI Copilot Trigger -->
+      <button onclick="toggleAiCopilot()" class="hidden sm:flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/75 hover:bg-white text-navy text-xs font-bold border border-brandPurple/25 shadow-sm transition cursor-pointer">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        <span>AI Concierge</span>
+      </button>
+
+      <!-- Command Palette Trigger (Cmd+K) -->
+      <button onclick="openCommandPalette()" title="Quick Command (Ctrl+K)" class="hidden lg:flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-navy/5 hover:bg-navy/10 text-navy/70 text-xs font-mono font-semibold transition cursor-pointer">
+        <i data-lucide="command" class="w-3.5 h-3.5"></i>
+        <span>Ctrl+K</span>
+      </button>
+
+      <button onclick="openLoginModal()" class="brand-gradient text-white font-semibold text-sm px-6 py-2.5 rounded-xl transition-all duration-300 cursor-pointer shadow-sm">
+        Login
+      </button>
+    </div>
+  </header>
+
+  
+  <main class="max-w-7xl mx-auto px-6 lg:px-12 py-6 relative z-20">
+    <!-- Top Route Telemetry Bar -->
+    <div class="reveal-up glass-panel rounded-3xl p-5 mb-8 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+      <div class="flex flex-wrap items-center gap-6">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Active Flight Corridor</span>
+          <span class="text-xl font-extrabold text-navy flex items-center gap-2.5">
+            <span id="summaryFrom">Jakarta</span>
+            <i data-lucide="plane" class="w-4 h-4 text-brandPurple"></i>
+            <span id="summaryTo">Tokyo</span>
+          </span>
+        </div>
+        <div class="h-9 w-px bg-slate-200 hidden sm:block"></div>
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Departure</span>
+          <span id="summaryDate" class="text-sm font-extrabold text-navy">2026-12-04</span>
+        </div>
+        <div class="h-9 w-px bg-slate-200 hidden sm:block"></div>
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Manifest</span>
+          <span id="summaryMeta" class="text-sm font-extrabold text-navy">2 Adults, 1 Child • Economy</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <select id="sortSelect" onchange="applyFilters()" class="bg-white/90 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-navy cursor-pointer focus:outline-none">
+          <option value="recommended">Sort: AI Recommended</option>
+          <option value="cheapest">Sort: Lowest Price</option>
+          <option value="fastest">Sort: Fastest Duration</option>
+        </select>
+        <a href="index.html" class="brand-gradient text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-1.5">
+          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i> Modify
+        </a>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <!-- Left Filters + AI Fare Predictor -->
+      <aside class="lg:col-span-3 space-y-5">
+        <!-- AI Fare Insight Card -->
+        <div class="glass-panel rounded-3xl p-5 border-l-4 border-l-brandPurple shadow-sm space-y-2">
+          <div class="flex items-center gap-2 text-xs font-extrabold text-brandPurple">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> AI FARE ADVISOR
+          </div>
+          <p class="text-xs text-navy/80 leading-relaxed">
+            <strong>Book Now:</strong> Prices on this corridor are projected to rise by <strong>$68</strong> within 48 hours.
+          </p>
+        </div>
+
+        <div class="glass-panel rounded-3xl p-6 space-y-6 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="font-extrabold text-navy text-sm">Filter Results</h2>
+            <button onclick="resetFilters()" class="text-xs font-bold text-brandPurple hover:underline cursor-pointer">Reset</button>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs font-bold mb-2">
+              <span class="text-slate-500">Max Budget</span>
+              <span id="priceLabel" class="text-navy font-mono">$1,200</span>
+            </div>
+            <input id="priceRange" type="range" min="300" max="1500" value="1200" oninput="applyFilters()" class="w-full accent-brandPurple cursor-pointer" />
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stops</span>
+            <label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer">
+              <input type="checkbox" value="Non-stop" checked onchange="applyFilters()" class="stop-filter w-4 h-4 accent-brandPurple" />
+              <span>Non-stop Direct</span>
+            </label>
+            <label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer">
+              <input type="checkbox" value="1 Stop" checked onchange="applyFilters()" class="stop-filter w-4 h-4 accent-brandPurple" />
+              <span>1 Stop Layover</span>
+            </label>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Carriers</span>
+            <label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer">
+              <input type="checkbox" value="Singapore Airlines" checked onchange="applyFilters()" class="airline-filter w-4 h-4 accent-brandPurple" />
+              <span>Singapore Airlines</span>
+            </label>
+            <label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer">
+              <input type="checkbox" value="ANA Airways" checked onchange="applyFilters()" class="airline-filter w-4 h-4 accent-brandPurple" />
+              <span>ANA Airways</span>
+            </label>
+            <label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer">
+              <input type="checkbox" value="Emirates" checked onchange="applyFilters()" class="airline-filter w-4 h-4 accent-brandPurple" />
+              <span>Emirates</span>
+            </label>
+            <label class="flex items-center gap-2.5 text-sm font-semibold cursor-pointer">
+              <input type="checkbox" value="Garuda Indonesia" checked onchange="applyFilters()" class="airline-filter w-4 h-4 accent-brandPurple" />
+              <span>Garuda Indonesia</span>
+            </label>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Flight Cards List -->
+      <section class="lg:col-span-9 space-y-4" id="flightsList"></section>
+    </div>
+  </main>
+
+  <!-- Interactive Aircraft Seat Map & Digital Boarding Pass Modal -->
+  <div id="bookingModal" class="fixed inset-0 bg-navy/50 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-7 shadow-2xl relative overflow-hidden">
+      <button onclick="closeBookingModal()" class="absolute top-5 right-5 text-slate-400 hover:text-navy z-10 cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <!-- Step 1: Fuselage Seat Selector -->
+      <div id="seatSelectionStep">
+        <div class="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-brandPurple">
+          <i data-lucide="armchair" class="w-4 h-4"></i> Interactive Cabin Map
+        </div>
+        <h3 class="text-xl font-extrabold text-navy mt-1" id="modalAirlineTitle">Select Your Seat</h3>
+        <p class="text-xs text-slate-500 mb-4" id="modalRouteSub">Jakarta → Tokyo</p>
+
+        <!-- Fuselage Nosecone Shape -->
+        <div class="bg-gradient-to-b from-purple-50/90 to-slate-50 rounded-t-[90px] rounded-b-3xl p-6 border border-purple-100 mb-5 max-w-xs mx-auto shadow-inner">
+          <div class="w-16 h-4 mx-auto mb-4 rounded-t-full bg-navy/80"></div>
+          <div class="text-center text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-3">A350-900 • CABIN DECK</div>
+          <div id="seatGrid" class="grid grid-cols-5 gap-2 items-center justify-items-center"></div>
+          <div class="flex justify-center gap-4 mt-5 text-[11px] font-semibold text-slate-500">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-white border border-slate-300 inline-block"></span> Open</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded brand-gradient inline-block"></span> Yours</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-slate-200 inline-block"></span> Taken</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+          <div>
+            <span class="text-xs text-slate-400 block">Assigned Seat & Fare</span>
+            <span class="text-lg font-extrabold text-navy font-mono" id="selectedSeatDisplay">SEAT 2A • $640</span>
+          </div>
+          <button onclick="confirmBooking()" class="brand-gradient text-white font-bold px-6 py-3 rounded-xl cursor-pointer shadow-md">
+            Issue Boarding Pass
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Realistic Perforated Digital Boarding Pass -->
+      <div id="bookingSuccessStep" class="hidden space-y-5 py-2">
+        <div class="text-center">
+          <span class="inline-flex items-center gap-1.5 text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i> E-TICKET ISSUED
+          </span>
+          <h3 class="text-2xl font-extrabold text-navy mt-2">Ready for Takeoff!</h3>
+        </div>
+
+        <!-- Boarding Pass Card -->
+        <div class="rounded-3xl overflow-hidden border border-purple-200 shadow-lg bg-gradient-to-br from-white to-purple-50/60 relative">
+          <div class="brand-gradient px-6 py-4 text-white flex items-center justify-between">
+            <div class="font-extrabold text-lg">FairFly <span class="font-mono text-xs opacity-80">BOARDING PASS</span></div>
+            <div class="font-mono text-xs font-bold" id="bpFlightCode">SQ-953</div>
+          </div>
+
+          <div class="p-6 space-y-5 relative">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-2xl font-extrabold text-navy" id="bpFromCode">JKT</div>
+                <div class="text-xs text-slate-500" id="bpFromFull">Jakarta</div>
+              </div>
+              <div class="flex-1 px-4 flex flex-col items-center">
+                <i data-lucide="plane" class="w-5 h-5 text-brandPurple"></i>
+                <div class="w-full border-t border-dashed border-purple-300 my-1"></div>
+                <span class="text-[10px] font-mono text-slate-400" id="bpDuration">7h 25m</span>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-extrabold text-navy" id="bpToCode">TYO</div>
+                <div class="text-xs text-slate-500" id="bpToFull">Tokyo</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-4 gap-2 bg-white/80 rounded-2xl p-3.5 border border-purple-100 text-center">
+              <div>
+                <span class="text-[10px] text-slate-400 block">DATE</span>
+                <span class="text-xs font-extrabold text-navy font-mono" id="bpDate">2026-12-04</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">GATE</span>
+                <span class="text-xs font-extrabold text-navy font-mono">G14</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">SEAT</span>
+                <span class="text-xs font-extrabold text-brandPurple font-mono" id="bpSeat">2A</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">REF</span>
+                <span class="text-xs font-extrabold text-navy font-mono" id="bpRef">#FF902</span>
+              </div>
+            </div>
+
+            <!-- Simulated Barcode -->
+            <div class="pt-2 border-t border-dashed border-slate-300 flex flex-col items-center">
+              <div class="h-10 w-full max-w-[260px] bg-[repeating-linear-gradient(90deg,#1E2235,#1E2235_2px,transparent_2px,transparent_5px,#1E2235_5px,#1E2235_8px,transparent_8px,transparent_11px)] opacity-85"></div>
+              <span class="text-[10px] font-mono text-slate-400 mt-1 tracking-[0.25em]" id="bpBarcodeNum">FF-2026-8849201</span>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="closeBookingModal()" class="w-full brand-gradient text-white font-bold py-3 rounded-xl cursor-pointer">
+          Done & Save Pass
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const stored = JSON.parse(localStorage.getItem('fairfly_search')) || {
+      from: 'Jakarta', to: 'Tokyo', date: '2026-12-04', travelers: '2 Adults, 1 Child', cabin: 'Economy'
+    };
+
+    document.getElementById('summaryFrom').innerText = stored.from;
+    document.getElementById('summaryTo').innerText = stored.to;
+    document.getElementById('summaryDate').innerText = stored.date;
+    document.getElementById('summaryMeta').innerText = `${stored.travelers} • ${stored.cabin}`;
+
+    const allFlights = [
+      { id: 1, airline: 'Singapore Airlines', code: 'SQ-953', dep: '08:15', arr: '16:40', mins: 445, duration: '7h 25m', stops: 'Non-stop', price: 640, badge: 'AI Top Pick', co2: '-14% CO₂' },
+      { id: 2, airline: 'ANA Airways', code: 'NH-836', dep: '10:30', arr: '18:50', mins: 440, duration: '7h 20m', stops: 'Non-stop', price: 720, badge: 'Fastest', co2: '-11% CO₂' },
+      { id: 3, airline: 'Garuda Indonesia', code: 'GA-874', dep: '13:45', arr: '22:15', mins: 450, duration: '7h 30m', stops: 'Non-stop', price: 585, badge: 'Best Value', co2: '-9% CO₂' },
+      { id: 4, airline: 'Emirates', code: 'EK-359', dep: '17:20', arr: '04:10', mins: 590, duration: '9h 50m', stops: '1 Stop', price: 890, badge: 'A380 Suite', co2: 'Standard' },
+      { id: 5, airline: 'Singapore Airlines', code: 'SQ-961', dep: '21:00', arr: '07:15', mins: 555, duration: '9h 15m', stops: '1 Stop', price: 540, badge: 'Lowest Fare', co2: '-12% CO₂' },
+      { id: 6, airline: 'ANA Airways', code: 'NH-856', dep: '23:30', arr: '08:00', mins: 450, duration: '7h 30m', stops: 'Non-stop', price: 695, badge: 'Nightliner', co2: '-15% CO₂' }
+    ];
+
+    let activeFlight = allFlights[0];
+    let selectedSeat = '2A';
+    const takenSeats = ['1B', '2C', '3A', '4D'];
+
+    function applyFilters() {
+      const maxPrice = parseInt(document.getElementById('priceRange').value);
+      document.getElementById('priceLabel').innerText = `$${maxPrice.toLocaleString()}`;
+      const checkedStops = Array.from(document.querySelectorAll('.stop-filter:checked')).map(el => el.value);
+      const checkedAirlines = Array.from(document.querySelectorAll('.airline-filter:checked')).map(el => el.value);
+      const sortBy = document.getElementById('sortSelect').value;
+
+      let filtered = allFlights.filter(f =>
+        f.price <= maxPrice && checkedStops.includes(f.stops) && checkedAirlines.includes(f.airline)
+      );
+
+      if (sortBy === 'cheapest') filtered.sort((a, b) => a.price - b.price);
+      if (sortBy === 'fastest') filtered.sort((a, b) => a.mins - b.mins);
+
+      renderFlights(filtered);
+    }
+
+    function resetFilters() {
+      playChime(520);
+      document.getElementById('priceRange').value = 1500;
+      document.querySelectorAll('.stop-filter, .airline-filter').forEach(cb => cb.checked = true);
+      applyFilters();
+    }
+
+    function renderFlights(list) {
+      const container = document.getElementById('flightsList');
+      if (list.length === 0) {
+        container.innerHTML = `<div class="glass-panel rounded-3xl p-10 text-center text-slate-500 font-bold">No flights match your filter criteria. Try increasing the max budget!</div>`;
+        return;
+      }
+
+      container.innerHTML = list.map((f, idx) => `
+        <div style="animation-delay: ${idx * 0.07}s" class="reveal-up glass-panel rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-xl hover:-translate-y-0.5 transition duration-300">
+          <div class="flex items-center gap-4 w-full md:w-auto">
+            <div class="w-12 h-12 rounded-2xl brand-gradient text-white font-extrabold flex items-center justify-center text-sm shrink-0 shadow-sm">
+              ${f.code.split('-')[0]}
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="font-extrabold text-navy">${f.airline}</h3>
+                <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-brandPurple">${f.badge}</span>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">${f.co2}</span>
+              </div>
+              <span class="text-xs text-slate-400 font-mono">${f.code} • ${stored.cabin}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-6 text-center">
+            <div>
+              <div class="text-xl font-extrabold text-navy">${f.dep}</div>
+              <div class="text-xs text-slate-400 font-semibold">${stored.from}</div>
+            </div>
+            <div class="flex flex-col items-center px-2">
+              <span class="text-[11px] font-bold text-slate-400">${f.duration}</span>
+              <svg width="110" height="22" viewBox="0 0 110 22" class="my-1">
+                <path d="M 6 18 Q 55 2 104 18" fill="none" stroke="#7C3AED" stroke-width="2" class="flight-arc-dash" />
+                <circle cx="6" cy="18" r="3" fill="#1E2235" />
+                <circle cx="104" cy="18" r="3" fill="#D946EF" />
+              </svg>
+              <span class="text-[11px] font-extrabold text-brandPurple">${f.stops}</span>
+            </div>
+            <div>
+              <div class="text-xl font-extrabold text-navy">${f.arr}</div>
+              <div class="text-xs text-slate-400 font-semibold">${stored.to}</div>
+            </div>
+          </div>
+
+          <div class="flex md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-4 md:pt-0 border-slate-100">
+            <div class="text-2xl font-extrabold text-navy">$${f.price}</div>
+            <button onclick="openBookingModal(${f.id})" class="brand-gradient text-white text-sm font-bold px-6 py-2.5 rounded-xl transition cursor-pointer shadow-sm">
+              Select Seat
+            </button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function openBookingModal(flightId) {
+      playChime(650);
+      activeFlight = allFlights.find(f => f.id === flightId);
+      document.getElementById('modalAirlineTitle').innerText = `${activeFlight.airline} (${activeFlight.code})`;
+      document.getElementById('modalRouteSub').innerText = `${stored.from} → ${stored.to} • ${stored.date}`;
+      document.getElementById('seatSelectionStep').classList.remove('hidden');
+      document.getElementById('bookingSuccessStep').classList.add('hidden');
+      renderSeats();
+      updateSeatLabel();
+
+      const modal = document.getElementById('bookingModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeBookingModal() {
+      const modal = document.getElementById('bookingModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderSeats() {
+      const rows = ['1', '2', '3', '4', '5'];
+      const grid = document.getElementById('seatGrid');
+      let html = '';
+      rows.forEach(r => {
+        ['A', 'B', 'AISLE', 'C', 'D'].forEach(col => {
+          if (col === 'AISLE') {
+            html += `<span class="text-[10px] font-mono text-slate-300">${r}</span>`;
+            return;
+          }
+          const seat = `${r}${col}`;
+          const isTaken = takenSeats.includes(seat);
+          const isSelected = seat === selectedSeat;
+          if (isTaken) {
+            html += `<button disabled class="w-10 py-2 rounded-lg text-[11px] font-mono font-bold bg-slate-200 text-slate-400 cursor-not-allowed">${seat}</button>`;
+          } else {
+            html += `<button type="button" onclick="selectSeat('${seat}')" class="w-10 py-2 rounded-lg text-[11px] font-mono font-bold border transition cursor-pointer ${isSelected ? 'brand-gradient text-white border-transparent shadow-sm scale-105' : 'bg-white text-navy border-slate-200 hover:border-brandPurple'}">${seat}</button>`;
+          }
+        });
+      });
+      grid.innerHTML = html;
+    }
+
+    function selectSeat(seat) {
+      playChime(720);
+      selectedSeat = seat;
+      renderSeats();
+      updateSeatLabel();
+    }
+
+    function updateSeatLabel() {
+      document.getElementById('selectedSeatDisplay').innerText = `SEAT ${selectedSeat} • $${activeFlight.price}`;
+    }
+
+    function confirmBooking() {
+      playChime(920);
+      if (typeof confetti === 'function') {
+        confetti({ particleCount: 75, spread: 65, origin: { y: 0.6 } });
+      }
+      document.getElementById('seatSelectionStep').classList.add('hidden');
+      document.getElementById('bookingSuccessStep').classList.remove('hidden');
+
+      document.getElementById('bpFlightCode').innerText = activeFlight.code;
+      document.getElementById('bpFromCode').innerText = stored.from.slice(0, 3).toUpperCase();
+      document.getElementById('bpFromFull').innerText = stored.from;
+      document.getElementById('bpToCode').innerText = stored.to.slice(0, 3).toUpperCase();
+      document.getElementById('bpToFull').innerText = stored.to;
+      document.getElementById('bpDuration').innerText = activeFlight.duration;
+      document.getElementById('bpDate').innerText = stored.date;
+      document.getElementById('bpSeat').innerText = selectedSeat;
+      document.getElementById('bpRef').innerText = `#FF${Math.floor(100 + Math.random()*899)}`;
+      lucide.createIcons();
+    }
+
+    applyFilters();
+  </script>
+
+  
+  <img id="escortJetBadge" src="jet.png" alt="FairFly Jet Escort" />
+
+  <!-- AI Travel Concierge Slide-Over Drawer -->
+  <div id="aiDrawer" class="fixed inset-y-0 right-0 w-full max-w-md bg-white/95 backdrop-blur-2xl shadow-2xl border-l border-purple-100 z-50 transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="p-6 border-b border-slate-100 flex items-center justify-between brand-gradient text-white">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-extrabold text-base">FairFly AI Flight Concierge</h3>
+          <p class="text-xs text-white/80">Live fare intelligence & instant booking</p>
+        </div>
+      </div>
+      <button onclick="toggleAiCopilot()" class="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <div id="aiChatMessages" class="flex-1 p-5 overflow-y-auto space-y-4 text-sm">
+      <div class="bg-purple-50 border border-purple-100 rounded-2xl rounded-tl-none p-4 text-navy">
+        👋 Hi! I'm your **FairFly AI Copilot**. Ask me to find cheap flights, suggest destinations, or compare cabin classes!
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button onclick="askAiPreset('Cheapest flight from Jakarta to Tokyo?')" class="text-xs font-semibold bg-slate-100 hover:bg-purple-100 text-navy px-3 py-1.5 rounded-full transition cursor-pointer">✈️ Jakarta → Tokyo deals</button>
+        <button onclick="askAiPreset('Best time to book Bali flights?')" class="text-xs font-semibold bg-slate-100 hover:bg-purple-100 text-navy px-3 py-1.5 rounded-full transition cursor-pointer">🌴 Bali fare forecast</button>
+        <button onclick="askAiPreset('Compare Economy vs Business Class')" class="text-xs font-semibold bg-slate-100 hover:bg-purple-100 text-navy px-3 py-1.5 rounded-full transition cursor-pointer">🥂 Cabin comparison</button>
+      </div>
+    </div>
+
+    <form onsubmit="handleAiChat(event)" class="p-4 border-t border-slate-100 flex gap-2 bg-white">
+      <input id="aiChatInput" type="text" placeholder="Ask e.g. 'Find non-stop flights to Paris'..." class="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-brandPurple" />
+      <button type="submit" class="brand-gradient text-white px-4 py-3 rounded-xl font-bold cursor-pointer">
+        <i data-lucide="send" class="w-4 h-4"></i>
+      </button>
+    </form>
+  </div>
+
+  <!-- Ctrl+K Command Palette Modal -->
+  <div id="cmdModal" class="fixed inset-0 bg-navy/45 backdrop-blur-sm hidden items-start justify-center pt-24 z-50 p-4" onclick="if(event.target===this) closeCommandPalette()">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center gap-3">
+        <i data-lucide="search" class="w-5 h-5 text-brandPurple"></i>
+        <input id="cmdSearchInput" type="text" oninput="filterCommands(this.value)" placeholder="Jump to page, destination, or action..." class="w-full text-sm font-semibold focus:outline-none" />
+        <span class="text-[10px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-500">ESC</span>
+      </div>
+      <div id="cmdList" class="p-2 max-h-72 overflow-y-auto divide-y divide-slate-50 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-navy/40 backdrop-blur-sm hidden items-center justify-center z-50 p-4" onclick="if(event.target===this) closeLoginModal()">
+    <div class="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl relative">
+      <button onclick="closeLoginModal()" class="absolute top-5 right-5 text-slate-400 hover:text-navy p-1 rounded-full cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+      <div class="text-2xl font-extrabold mb-1">
+        <span class="text-navy">Fair</span><span class="text-brandMagenta">Fly</span> <span class="text-xs font-mono bg-purple-100 text-brandPurple px-2 py-0.5 rounded-full align-middle">PRO</span>
+      </div>
+      <p class="text-slate-500 text-sm mb-6">Sign in to sync boarding passes, lounge passes, and FairMiles.</p>
+
+      <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Email Address</label>
+          <input type="email" required placeholder="captain@fairfly.aero" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-brandPurple text-sm" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">Password</label>
+          <input type="password" required placeholder="••••••••" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-brandPurple text-sm" />
+        </div>
+        <button type="submit" class="w-full brand-gradient text-white font-semibold py-3 rounded-xl transition cursor-pointer">
+          Authenticate
+        </button>
+      </form>
+      <div id="loginSuccessMsg" class="hidden mt-4 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold text-center">
+        Authenticated! Welcome aboard, Captain.
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="max-w-7xl mx-auto px-6 lg:px-12 py-8 mt-8 border-t border-navy/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-navy/70 relative z-20">
+    <div class="flex items-center gap-2 font-extrabold text-base">
+      <span class="text-navy">Fair</span><span class="text-brandMagenta">Fly</span>
+      <span class="font-mono text-[10px] px-2 py-0.5 rounded-full bg-white/70 border border-purple-200 text-brandPurple">AERO-OS v2.6</span>
+    </div>
+    <div class="flex flex-wrap justify-center gap-6 font-semibold">
+      <a href="index.html" class="hover:text-navy">Home</a>
+      <a href="flights.html" class="hover:text-navy">Flights</a>
+      <a href="destinations.html" class="hover:text-navy">Destinations</a>
+      <a href="deals.html" class="hover:text-navy">Deals</a>
+      <a href="about.html" class="hover:text-navy">About Us</a>
+      <a href="support.html" class="hover:text-navy">Support</a>
+    </div>
+    <div>© 2026 FairFly Aviation Inc. • Live Telemetry Active</div>
+  </footer>
+
+  <script src="js/app.js"></script>
+  <script src="js/jet-engine.js"></script>
+</body>
+</html>
